@@ -1,4 +1,4 @@
-package io.github.devsona.devsona
+package io.github.devsona.api
 
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest

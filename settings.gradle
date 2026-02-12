@@ -1,1 +1,5 @@
 rootProject.name = 'devsona'
+
+include 'devsona-domain'
+include 'devsona-infra'
+include 'devsona-api'
