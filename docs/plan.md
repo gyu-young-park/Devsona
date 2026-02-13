@@ -137,6 +137,134 @@
 
 ---
 
-## 다음 단계: Phase 2 - 유저 스토리
+## 7. 기술 스택 & 아키텍처
 
-> 위 내용 확인 후 유저 스토리 → 기능 명세 → 와이어프레임 순서로 진행
+### 기술 스택
+
+| 항목 | 선택 |
+|------|------|
+| **언어** | Kotlin 2.2 |
+| **프레임워크** | Spring Boot 4.0.2 |
+| **DB** | PostgreSQL |
+| **ORM** | Spring Data JPA |
+| **빌드** | Gradle (멀티모듈) |
+| **인증** | OAuth 다중 (GitHub, Google 등) + JWT |
+| **프론트엔드** | 별도 프로젝트 (REST API 통신) |
+
+### 멀티모듈 구조
+
+```
+devsona/
+├── devsona-domain   # 순수 Kotlin - 비즈니스 모델, Repository 인터페이스
+├── devsona-infra    # JPA Entity, Repository 구현체, 외부 API 클라이언트
+└── devsona-api      # REST Controller, DTO, 인증
+```
+
+- **domain**: 프레임워크 의존 없는 순수 Kotlin 모듈. 비즈니스 모델과 Repository 인터페이스(포트)만 정의
+- **infra**: JPA Entity로 DB 매핑. domain 모델 ↔ Entity 변환 담당. 외부 API 연동
+- **api**: REST API 엔드포인트, 요청/응답 DTO, 인증 처리
+
+### 엔티티 설계 방침
+
+- domain 모듈의 모델은 **일반 class** 사용 (data class X)
+  - JPA 프록시/지연로딩 호환 문제 회피
+  - equals/hashCode를 ID 기반으로 직접 제어
+- infra 모듈에서 JPA Entity 클래스를 별도로 정의하고, `toDomain()` / `from()` 메서드로 변환
+
+---
+
+## 8. 도메인 모델 설계
+
+### Member (회원)
+
+| 필드 | 타입 | 설명 | 비고 |
+|------|------|------|------|
+| id | Long? | PK | auto increment |
+| email | String | 이메일 | unique |
+| username | String | 프로필 URL용 식별자 | unique |
+| name | String | 표시 이름 | |
+| avatarUrl | String? | 프로필 이미지 URL | nullable |
+| bio | String? | 자기소개 | nullable |
+| createdAt | LocalDateTime | 생성일 | |
+| updatedAt | LocalDateTime | 수정일 | |
+
+> githubId는 Member에 넣지 않음. GitHub 계정이 없는 사용자도 있으므로 OAuth 연동 정보로 분리.
+
+### OAuthConnection (소셜 로그인 연동)
+
+| 필드 | 타입 | 설명 | 비고 |
+|------|------|------|------|
+| id | Long? | PK | auto increment |
+| memberId | Long | FK → Member | |
+| provider | OAuthProvider | GITHUB, GOOGLE | enum |
+| providerUserId | String | OAuth 제공자의 유저 ID | |
+| accessToken | String | 연동 토큰 | |
+| createdAt | LocalDateTime | 생성일 | |
+
+> 로그인은 OAuth 다중 방식. password 필드 없음.
+
+### Link (링크)
+
+| 필드 | 타입 | 설명 | 비고 |
+|------|------|------|------|
+| id | Long? | PK | auto increment |
+| memberId | Long | FK → Member | |
+| linkType | LinkType | GITHUB, BLOG, YOUTUBE, CUSTOM | enum |
+| title | String | 표시 제목 | |
+| url | String | 링크 URL | |
+| displayOrder | Int | 정렬 순서 | |
+
+> 처음부터 linkType을 구분. 나중에 GitHub URL이면 자동 연동하는 등 확장 가능.
+
+---
+
+## 9. API 설계
+
+### 공개 API (인증 불필요)
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| GET | `/api/profiles/{username}` | 프로필 조회 (Member 정보 + Link 목록) |
+
+### 회원 API (인증 필요)
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| PUT | `/api/members/me` | 내 프로필 수정 (name, bio, avatarUrl) |
+
+### 링크 API (인증 필요)
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| GET | `/api/members/me/links` | 내 링크 목록 조회 |
+| POST | `/api/members/me/links` | 링크 추가 |
+| PUT | `/api/members/me/links/{linkId}` | 링크 수정 |
+| DELETE | `/api/members/me/links/{linkId}` | 링크 삭제 |
+| PUT | `/api/members/me/links/order` | 링크 순서 변경 |
+
+---
+
+## 10. 개발 로드맵
+
+### Step 1: 사용자 + 링크 기본 (현재)
+> 모든 기능의 기반
+
+- domain: Member, OAuthConnection, Link 모델 + Repository 인터페이스
+- infra: JPA Entity + Repository 구현체
+- api: 프로필 조회, 프로필 수정, 링크 CRUD API
+
+### Step 2: OAuth 로그인
+- GitHub / Google OAuth 연동
+- JWT 토큰 발급 및 인증 처리
+
+### Step 3: 특수 링크 연동
+- GitHub URL → 핀 프로젝트, 잔디, 기술 스택 자동 연동
+- Blog URL → RSS 파싱으로 최신 글 표시
+- YouTube URL → 채널 영상 동기화
+
+### Step 4: 자동 동기화
+- 스케줄러 기반 주기적 데이터 갱신
+
+### Step 5: 부가 기능
+- DM/문의 기능 + 이메일 알림
+- PDF 출력
