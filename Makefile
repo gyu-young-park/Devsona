@@ -13,7 +13,7 @@ pg-up:
 		-e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
 		-e POSTGRES_DB=$(POSTGRES_DB) \
 		-p $(POSTGRES_PORT):5432 \
-		-v devsona-pgdata:/var/lib/postgresql/data \
+		-v devsona-pgdata:/var/lib/postgresql \
 		postgres:latest
 	@echo "PostgreSQL started on port $(POSTGRES_PORT)"
 
